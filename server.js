@@ -74,8 +74,21 @@ ${text}
   const data = await response.json();
   if (!data.success) throw new Error(data.errors?.[0]?.message || 'Cloudflare AI error');
 
-  const raw = data.result?.response ?? '{}';
-  const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+  console.log('CF analyze raw response:', JSON.stringify(data.result));
+
+  let raw = data.result?.response;
+  if (typeof raw !== 'string') {
+    // some Workers AI models return an object/array instead of a plain string
+    raw = JSON.stringify(raw ?? {});
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+  } catch (e) {
+    console.error('Could not parse model output as JSON:', raw);
+    throw new Error('The AI response was not valid JSON — try again.');
+  }
 
   if (!parsed.language_ok) {
     const err = new Error(parsed.reason_if_rejected || 'Entry rejected.');
