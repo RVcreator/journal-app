@@ -1,20 +1,18 @@
 /**
- * Daybook backend — proxies AI calls so API keys never touch the browser.
- * Runs entirely on Cloudflare Workers AI's FREE tier (~10,000 neurons/day,
- * no credit card required) — both the text analysis and image generation
- * steps use it, so the whole pipeline costs $0 at your one-entry-per-day scale.
+ * Daybook backend — real auth + real database + free AI.
  *
- * Get credentials (both free, no card needed):
- *   1. Sign up at https://dash.cloudflare.com
- *   2. Your Account ID is on the right side of the dashboard home page
- *   3. Create an API token: My Profile > API Tokens > Create Token >
- *      "Workers AI" template (or custom token with "Workers AI: Edit" permission)
+ * - Postgres (hosted on Neon's free tier) stores users, entries, and cover prefs
+ * - bcrypt hashes passwords (never stored in plain text)
+ * - JWT gives each logged-in user a token (sent as "Authorization: Bearer <token>")
+ * - Cloudflare Workers AI (free tier) still handles text analysis + image generation
  *
  * Local run:
  *   npm install
  *   node server.js
  *
- * Requires a .env file locally (see .env.example) with:
+ * Requires a .env file locally (see .env.example):
+ *   DATABASE_URL=...        (from Neon)
+ *   JWT_SECRET=...          (any long random string)
  *   CLOUDFLARE_ACCOUNT_ID=...
  *   CLOUDFLARE_API_TOKEN=...
  * On Render, set these as Environment Variables in the dashboard instead of a .env file.
@@ -23,22 +21,214 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { Pool } = require('pg');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '2mb' }));
 
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }, // required for Neon
+});
+
+// ---------------------------------------------------------------
+// Database setup — creates tables on startup if they don't exist yet
+// ---------------------------------------------------------------
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      first_name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS entries (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      entry_date DATE NOT NULL,
+      text_content TEXT NOT NULL,
+      word_count INTEGER,
+      mood TEXT,
+      keywords JSONB,
+      image_base64 TEXT,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE(user_id, entry_date)
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cover_prefs (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      color TEXT DEFAULT '#E8A15C',
+      pattern TEXT DEFAULT 'solid',
+      icon TEXT DEFAULT 'moonStars'
+    );
+  `);
+  console.log('Database tables ready.');
+}
+
+// ---------------------------------------------------------------
+// Auth helpers
+// ---------------------------------------------------------------
+function formatFirstName(raw) {
+  const firstWord = (raw || '').trim().split(/\s+/)[0] || '';
+  return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+}
+
+function signToken(user) {
+  return jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '30d' });
+}
+
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Not logged in.' });
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch (e) {
+    res.status(401).json({ error: 'Session expired — please log in again.' });
+  }
+}
+
+// ---------------------------------------------------------------
+// AUTH ROUTES
+// ---------------------------------------------------------------
+app.post('/api/signup', async (req, res) => {
+  try {
+    const { firstName, email, password } = req.body;
+    if (!firstName || !email || !password) {
+      return res.status(400).json({ error: 'Please fill in every field.' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password needs to be at least 6 characters.' });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = formatFirstName(firstName);
+
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [cleanEmail]);
+    if (existing.rows.length) {
+      return res.status(409).json({ error: 'An account with that email already exists — try logging in instead.' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO users (first_name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, first_name, email',
+      [cleanName, cleanEmail, passwordHash]
+    );
+    const user = result.rows[0];
+    await pool.query('INSERT INTO cover_prefs (user_id) VALUES ($1)', [user.id]);
+
+    const token = signToken(user);
+    res.json({ token, user: { firstName: user.first_name, email: user.email } });
+  } catch (err) {
+    console.error('/api/signup failed:', err.message);
+    res.status(500).json({ error: 'Signup failed. Try again.' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Please fill in every field.' });
+    const cleanEmail = email.trim().toLowerCase();
+
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [cleanEmail]);
+    const user = result.rows[0];
+    if (!user) return res.status(401).json({ error: 'Incorrect email or password.' });
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Incorrect email or password.' });
+
+    const token = signToken(user);
+    res.json({ token, user: { firstName: user.first_name, email: user.email } });
+  } catch (err) {
+    console.error('/api/login failed:', err.message);
+    res.status(500).json({ error: 'Login failed. Try again.' });
+  }
+});
+
+app.get('/api/me', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT first_name, email FROM users WHERE id = $1', [req.user.userId]);
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found.' });
+    res.json({ user: { firstName: result.rows[0].first_name, email: result.rows[0].email } });
+  } catch (err) {
+    console.error('/api/me failed:', err.message);
+    res.status(500).json({ error: 'Could not load account.' });
+  }
+});
+
+// ---------------------------------------------------------------
+// COVER PREFERENCES
+// ---------------------------------------------------------------
+app.get('/api/cover-prefs', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT color, pattern, icon FROM cover_prefs WHERE user_id = $1', [req.user.userId]);
+    res.json(result.rows[0] || { color: '#E8A15C', pattern: 'solid', icon: 'moonStars' });
+  } catch (err) {
+    console.error('/api/cover-prefs GET failed:', err.message);
+    res.status(500).json({ error: 'Could not load cover preferences.' });
+  }
+});
+
+app.put('/api/cover-prefs', requireAuth, async (req, res) => {
+  try {
+    const { color, pattern, icon } = req.body;
+    await pool.query(
+      `INSERT INTO cover_prefs (user_id, color, pattern, icon) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (user_id) DO UPDATE SET color=$2, pattern=$3, icon=$4`,
+      [req.user.userId, color, pattern, icon]
+    );
+    res.json({ color, pattern, icon });
+  } catch (err) {
+    console.error('/api/cover-prefs PUT failed:', err.message);
+    res.status(500).json({ error: 'Could not save cover preferences.' });
+  }
+});
+
+// ---------------------------------------------------------------
+// ENTRIES
+// ---------------------------------------------------------------
+app.get('/api/entries', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT entry_date, text_content, word_count, mood, keywords, image_base64 FROM entries WHERE user_id = $1 ORDER BY entry_date',
+      [req.user.userId]
+    );
+    const entries = {};
+    for (const row of result.rows) {
+      const dateKey = row.entry_date.toISOString().slice(0, 10);
+      entries[dateKey] = {
+        text: row.text_content,
+        wordCount: row.word_count,
+        mood: row.mood,
+        keywords: row.keywords,
+        imageUrl: row.image_base64,
+      };
+    }
+    res.json(entries);
+  } catch (err) {
+    console.error('/api/entries GET failed:', err.message);
+    res.status(500).json({ error: 'Could not load entries.' });
+  }
+});
+
+// ---------------------------------------------------------------
+// STEP 1: Analyze the journal entry — extract mood + visual keywords
+// Uses Cloudflare Workers AI's free Llama model
+// ---------------------------------------------------------------
 const CF_BASE = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/run`;
 const CF_HEADERS = {
   'Content-Type': 'application/json',
   Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
 };
 
-// ---------------------------------------------------------------
-// STEP 1: Analyze the journal entry — extract mood + visual keywords
-// Uses Cloudflare Workers AI's free Llama model (text-only, no cost)
-// Model catalog: https://developers.cloudflare.com/workers-ai/models/
-// ---------------------------------------------------------------
 async function analyzeEntry(text) {
   if (!text || text.trim().split(/\s+/).length < 100) {
     const err = new Error('Entry must be at least 100 words.');
@@ -74,13 +264,8 @@ ${text}
   const data = await response.json();
   if (!data.success) throw new Error(data.errors?.[0]?.message || 'Cloudflare AI error');
 
-  console.log('CF analyze raw response:', JSON.stringify(data.result));
-
   let raw = data.result?.response;
-  if (typeof raw !== 'string') {
-    // some Workers AI models return an object/array instead of a plain string
-    raw = JSON.stringify(raw ?? {});
-  }
+  if (typeof raw !== 'string') raw = JSON.stringify(raw ?? {});
 
   let parsed;
   try {
@@ -95,12 +280,11 @@ ${text}
     err.status = 422;
     throw err;
   }
-  return parsed; // { mood, keywords, image_prompt }
+  return parsed;
 }
 
 // ---------------------------------------------------------------
-// STEP 2: Generate the actual image from the AI-built prompt
-// Uses Cloudflare Workers AI's free FLUX.1 Schnell model
+// STEP 2: Generate the actual image — Cloudflare's free FLUX.1 Schnell
 // ---------------------------------------------------------------
 async function generateImage(image_prompt, mood) {
   const fullPrompt = `Hand-drawn doodle illustration, notebook sketch style, black ink outlines,
@@ -114,41 +298,39 @@ soft pastel watercolor wash, warm cream paper background. Mood: ${mood}. Scene: 
 
   const data = await response.json();
   if (!data.success) throw new Error(data.errors?.[0]?.message || 'Cloudflare image error');
-
-  // FLUX Schnell on Workers AI returns base64-encoded PNG in result.image
   return `data:image/png;base64,${data.result.image}`;
 }
 
-// Individual endpoints — handy for testing each step in isolation
-app.post('/api/analyze', async (req, res) => {
-  try {
-    res.json(await analyzeEntry(req.body.text));
-  } catch (err) {
-    console.error('/api/analyze failed:', err.message);
-    res.status(err.status || 500).json({ error: err.message });
-  }
-});
-
-app.post('/api/generate-image', async (req, res) => {
-  try {
-    const image_base64 = await generateImage(req.body.image_prompt, req.body.mood);
-    res.json({ image_base64 });
-  } catch (err) {
-    console.error('/api/generate-image failed:', err.message);
-    res.status(err.status || 500).json({ error: err.message });
-  }
-});
-
 // ---------------------------------------------------------------
-// STEP 3: Combined endpoint — what the frontend actually calls
+// POST /api/entries — the real save-a-day-entry endpoint the frontend calls.
+// Enforces one-per-day at the database level (UNIQUE constraint), analyzes,
+// generates the image, and stores everything in one go.
 // ---------------------------------------------------------------
-app.post('/api/entry-to-image', async (req, res) => {
+app.post('/api/entries', requireAuth, async (req, res) => {
   try {
-    const analysis = await analyzeEntry(req.body.text);
+    const { text } = req.body;
+
+    const existing = await pool.query(
+      'SELECT id FROM entries WHERE user_id = $1 AND entry_date = CURRENT_DATE',
+      [req.user.userId]
+    );
+    if (existing.rows.length) {
+      return res.status(409).json({ error: "You've already journaled today — come back tomorrow." });
+    }
+
+    const analysis = await analyzeEntry(text);
     const image_base64 = await generateImage(analysis.image_prompt, analysis.mood);
-    res.json({ ...analysis, image_base64 });
+    const wordCount = text.trim().split(/\s+/).length;
+
+    await pool.query(
+      `INSERT INTO entries (user_id, entry_date, text_content, word_count, mood, keywords, image_base64)
+       VALUES ($1, CURRENT_DATE, $2, $3, $4, $5, $6)`,
+      [req.user.userId, text, wordCount, analysis.mood, JSON.stringify(analysis.keywords), image_base64]
+    );
+
+    res.json({ mood: analysis.mood, keywords: analysis.keywords, image_base64, wordCount });
   } catch (err) {
-    console.error('/api/entry-to-image failed:', err.message);
+    console.error('/api/entries POST failed:', err.message);
     res.status(err.status || 500).json({ error: err.message });
   }
 });
@@ -156,4 +338,9 @@ app.post('/api/entry-to-image', async (req, res) => {
 app.get('/', (req, res) => res.send('Daybook backend is running.'));
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Daybook backend running on port ${PORT}`));
+initDb()
+  .then(() => app.listen(PORT, () => console.log(`Daybook backend running on port ${PORT}`)))
+  .catch(err => {
+    console.error('Failed to initialize database:', err.message);
+    process.exit(1);
+  });
