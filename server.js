@@ -315,12 +315,16 @@ soft pastel watercolor wash, warm cream paper background. Mood: ${mood}. Scene: 
 // ---------------------------------------------------------------
 app.post('/api/entries', requireAuth, async (req, res) => {
   try {
-    const { text, attachedImages } = req.body;
+    const { text, attachedImages, date } = req.body;
     const images = Array.isArray(attachedImages) ? attachedImages.slice(0, 3) : [];
 
+    // The client sends its own local calendar date (YYYY-MM-DD) so "today" always
+    // matches what the user's device considers today, regardless of server timezone.
+    const entryDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
+
     const existing = await pool.query(
-      'SELECT id FROM entries WHERE user_id = $1 AND entry_date = CURRENT_DATE',
-      [req.user.userId]
+      'SELECT id FROM entries WHERE user_id = $1 AND entry_date = $2',
+      [req.user.userId, entryDate]
     );
     if (existing.rows.length) {
       return res.status(409).json({ error: "You've already journaled today — come back tomorrow." });
@@ -332,8 +336,8 @@ app.post('/api/entries', requireAuth, async (req, res) => {
 
     await pool.query(
       `INSERT INTO entries (user_id, entry_date, text_content, word_count, mood, keywords, image_base64, attached_images)
-       VALUES ($1, CURRENT_DATE, $2, $3, $4, $5, $6, $7)`,
-      [req.user.userId, text, wordCount, analysis.mood, JSON.stringify(analysis.keywords), image_base64, JSON.stringify(images)]
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [req.user.userId, entryDate, text, wordCount, analysis.mood, JSON.stringify(analysis.keywords), image_base64, JSON.stringify(images)]
     );
 
     res.json({ mood: analysis.mood, keywords: analysis.keywords, image_base64, wordCount });
