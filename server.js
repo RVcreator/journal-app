@@ -27,7 +27,7 @@ const { Pool } = require('pg');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '8mb' }));
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -57,9 +57,15 @@ async function initDb() {
       mood TEXT,
       keywords JSONB,
       image_base64 TEXT,
+      attached_images JSONB DEFAULT '[]'::jsonb,
       created_at TIMESTAMPTZ DEFAULT now(),
       UNIQUE(user_id, entry_date)
     );
+  `);
+  // Safe to run even if the column already exists, and safe on a table that
+  // already existed before this column was added.
+  await pool.query(`
+    ALTER TABLE entries ADD COLUMN IF NOT EXISTS attached_images JSONB DEFAULT '[]'::jsonb;
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS cover_prefs (
@@ -198,7 +204,7 @@ app.put('/api/cover-prefs', requireAuth, async (req, res) => {
 app.get('/api/entries', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT entry_date, text_content, word_count, mood, keywords, image_base64 FROM entries WHERE user_id = $1 ORDER BY entry_date',
+      'SELECT entry_date, text_content, word_count, mood, keywords, image_base64, attached_images FROM entries WHERE user_id = $1 ORDER BY entry_date',
       [req.user.userId]
     );
     const entries = {};
@@ -210,6 +216,7 @@ app.get('/api/entries', requireAuth, async (req, res) => {
         mood: row.mood,
         keywords: row.keywords,
         imageUrl: row.image_base64,
+        attachedImages: row.attached_images || [],
       };
     }
     res.json(entries);
@@ -308,7 +315,8 @@ soft pastel watercolor wash, warm cream paper background. Mood: ${mood}. Scene: 
 // ---------------------------------------------------------------
 app.post('/api/entries', requireAuth, async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, attachedImages } = req.body;
+    const images = Array.isArray(attachedImages) ? attachedImages.slice(0, 3) : [];
 
     const existing = await pool.query(
       'SELECT id FROM entries WHERE user_id = $1 AND entry_date = CURRENT_DATE',
@@ -323,9 +331,9 @@ app.post('/api/entries', requireAuth, async (req, res) => {
     const wordCount = text.trim().split(/\s+/).length;
 
     await pool.query(
-      `INSERT INTO entries (user_id, entry_date, text_content, word_count, mood, keywords, image_base64)
-       VALUES ($1, CURRENT_DATE, $2, $3, $4, $5, $6)`,
-      [req.user.userId, text, wordCount, analysis.mood, JSON.stringify(analysis.keywords), image_base64]
+      `INSERT INTO entries (user_id, entry_date, text_content, word_count, mood, keywords, image_base64, attached_images)
+       VALUES ($1, CURRENT_DATE, $2, $3, $4, $5, $6, $7)`,
+      [req.user.userId, text, wordCount, analysis.mood, JSON.stringify(analysis.keywords), image_base64, JSON.stringify(images)]
     );
 
     res.json({ mood: analysis.mood, keywords: analysis.keywords, image_base64, wordCount });
