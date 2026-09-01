@@ -237,8 +237,8 @@ const CF_HEADERS = {
 };
 
 async function analyzeEntry(text) {
-  if (!text || text.trim().split(/\s+/).length < 100) {
-    const err = new Error('Entry must be at least 100 words.');
+  if (!text || text.trim().split(/\s+/).length < 50) {
+    const err = new Error('Entry must be at least 50 words.');
     err.status = 400;
     throw err;
   }
@@ -247,14 +247,22 @@ async function analyzeEntry(text) {
     method: 'POST',
     headers: CF_HEADERS,
     body: JSON.stringify({
+      temperature: 0.25,
+      max_tokens: 400,
       messages: [
         {
+          role: 'system',
+          content: `You are a careful, literal reader. You NEVER invent details that are not in the text.
+Every keyword and image detail you output must be traceable to a specific word or phrase the person actually wrote.
+If the entry is short on concrete detail, prefer fewer, more accurate keywords over padding with generic ones like "day", "life", "time", "feelings".`,
+        },
+        {
           role: 'user',
-          content: `Read this journal entry and respond with ONLY valid JSON, no other text, no markdown fences:
+          content: `Read this journal entry closely. Respond with ONLY valid JSON, no other text, no markdown fences:
 {
-  "mood": one of ["sunny","cloudy","rainy","stormy","cozy"],
-  "keywords": [3 short concrete visual nouns/scenes from the entry, lowercase],
-  "image_prompt": "one vivid sentence describing an illustration that captures the mood and a hint of the day's events, no people's real names",
+  "mood": one of ["sunny","cloudy","rainy","stormy","cozy"] — pick based on the emotional tone actually expressed, not assumed,
+  "keywords": [3 to 5 concrete nouns or short scenes that are LITERALLY mentioned in the entry — e.g. specific places, objects, activities, weather, food. Do not use vague words like "day", "moment", "life". If the entry only supports 2 solid keywords, return 2 rather than inventing a 3rd],
+  "image_prompt": "one vivid sentence for an illustration, built ONLY from specific things mentioned in the entry (the actual setting, objects, activity, weather) plus the mood — no invented scenery that isn't implied by the text, no people's real names",
   "language_ok": true or false (false if the entry is not coherent English),
   "reason_if_rejected": "" or a short reason if language_ok is false
 }
