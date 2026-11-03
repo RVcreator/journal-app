@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daybook — a vintage journal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:      #FCF9F4;
+    --paper-line: #ECE1D6;
+    --cream:      #F6EFE4;
+    --beige:      #E9DFCB;
+    --beige-dark: #CBB48C;
+    --ink:        #504338;
+    --ink-soft:   #93816F;
+    --gold:       #C4A672;
+    --rose:       #D2A3A8;
+    --blush:      #E8C4C8;
+    --lavender:   #C9B8D4;
+    --sage:       #AEBB9C;
+    --sky:        #A9C4CC;
+    --peach:      #E8C9AC;
+    --hl-yellow:  #F1E2A0;
+    --hl-green:   #C6D8AE;
+    --hl-pink:    #EBC3C6;
+    --hl-blue:    #BFD3D8;
+    --hl-orange:  #E8C199;
+    --shadow:     rgba(80,67,56,0.15);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--blush) 55%, transparent) 0%, transparent 38%),
+      radial-gradient(circle at 90% 12%, color-mix(in srgb, var(--sky) 55%, transparent) 0%, transparent 36%),
+      radial-gradient(circle at 85% 88%, color-mix(in srgb, var(--peach) 55%, transparent) 0%, transparent 40%),
+      radial-gradient(circle at 8% 85%, color-mix(in srgb, var(--lavender) 55%, transparent) 0%, transparent 38%),
+      var(--cream);
+    font-family:'Nunito', sans-serif;
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:70px 24px 40px;
+  }
+  h1,h2,h3, .hand{ font-family:'Caveat', cursive; }
+  .serif{ font-family:'Cormorant Garamond', serif; }
+  button{ font-family:'Nunito', sans-serif; cursor:pointer; }
+  .app{
+    width:100%;
+    max-width:min(880px, 92vw);
+    position:relative;
+  }
+  .screen{ display:none; }
+  .screen.active{ display:block; animation: pop-in .45s cubic-bezier(.22,.9,.32,1); }
+  @keyframes pop-in{ from{ opacity:0; transform:translateY(14px) scale(.985);} to{opacity:1; transform:translateY(0) scale(1);} }
+  @media (prefers-reduced-motion: reduce){ .screen.active{ animation:none; } }
+
+  /* ---------- soft vintage border ---------- */
+  .wobble{
+    border:2px solid var(--ink);
+    border-radius: 18px;
+  }
+  .wobble2{
+    border:2px solid var(--ink);
+    border-radius: 12px;
+  }
+
+  /* ---------- STRING LIGHTS (top, original vector art) ---------- */
+  #string-lights{
+    position:fixed; top:0; left:0; width:100%; height:64px;
+    pointer-events:none; z-index:6;
+  }
+  #string-lights svg{ width:100%; height:100%; display:block; }
+
+  /* ---------- CORNER DECORATIONS (original vector art, not stock images) ---------- */
+  .corner-deco{
+    position:fixed; width:150px; height:150px; pointer-events:none; z-index:1; opacity:.9;
+  }
+  .corner-deco.tl{ top:64px; left:18px; }
+  .corner-deco.tr{ top:64px; right:18px; }
+  .corner-deco.bl{ bottom:18px; left:18px; }
+  .corner-deco.br{ bottom:18px; right:18px; }
+  @media (max-width: 1000px){ .corner-deco{ display:none; } }
+
+  /* ---------- COVER SCREEN ---------- */
+  #cover-screen .book{
+    background: linear-gradient(160deg, #EFE6D0, #DDCBA0);
+    padding: 46px 36px 54px;
+    position:relative;
+    box-shadow: 0 10px 26px var(--shadow);
+  }
+  #cover-screen h1{ font-size:3.4rem; font-weight:700; margin:0 0 6px; color:var(--ink); text-align:center; text-shadow: 0 2px 0 rgba(255,255,255,.5); letter-spacing:.5px; }
+  #cover-screen p.tag{ margin:0 0 30px; color:var(--ink); font-weight:600; opacity:.85; font-size:1.15rem; text-align:center; font-family:'Cormorant Garamond',serif; font-style:italic; }
+  .cover-doodle{ display:block; margin:8px auto 34px; width:56%; }
+  #open-btn{
+    display:block; margin:0 auto;
+    background:var(--gold); color:var(--paper);
+    padding:15px 34px; font-size:1.2rem; font-weight:900;
+    border:2px solid var(--ink); border-radius:30px;
+    box-shadow:0 6px 14px var(--shadow);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  #open-btn:hover{ transform:translateY(-2px); box-shadow:0 10px 20px var(--shadow); }
+
+  /* ---------- HEADER (streak) ---------- */
+  .top-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .streak-pill{
+    display:flex; align-items:center; gap:8px;
+    background:var(--paper); border:2px solid var(--ink);
+    padding:8px 16px 8px 10px; border-radius:30px; font-weight:700;
+    box-shadow:0 3px 8px var(--shadow);
+  }
+  .streak-pill svg{ width:22px; height:22px; }
+  .streak-flicker{ animation: flicker 1.8s infinite ease-in-out; transform-origin:50% 90%; }
+  @keyframes flicker{ 0%,100%{ transform:rotate(-3deg) scale(1);} 50%{ transform:rotate(3deg) scale(1.06);} }
+  @media (prefers-reduced-motion: reduce){ .streak-flicker{ animation:none; } }
+
+  .icon-btn{
+    background:var(--paper); border:2px solid var(--ink); border-radius:50%;
+    width:44px; height:44px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 3px 8px var(--shadow);
+  }
+  .icon-btn svg{ width:20px; height:20px; }
+
+  /* ---------- NOTEBOOK PAGE ---------- */
+  .notebook{ position:relative; }
+  .page{
+    position:relative;
+    background:var(--paper);
+    border:2px solid var(--ink);
+    border-radius: 16px;
+    padding:36px 40px;
+    box-shadow:0 12px 30px var(--shadow);
+    background-image: repeating-linear-gradient(var(--paper) 0 38px, var(--paper-line) 38px 39px);
+    background-position: 0 92px;
+  }
+  .page h2{ margin:0 0 2px; font-size:2rem; }
+  .page .date-sub{ color:var(--ink-soft); margin:0 0 18px; font-size:1.05rem; font-family:'Cormorant Garamond',serif; font-style:italic; }
+
+  .mood-row{ display:flex; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+  .mood-btn{
+    background:var(--cream); border:2px solid var(--ink); border-radius:50%;
+    width:54px; height:54px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 3px 6px var(--shadow);
+    transition:transform .18s cubic-bezier(.34,1.56,.64,1), background .15s ease, box-shadow .18s ease;
+  }
+  .mood-btn:hover{ transform:translateY(-2px) scale(1.05); }
+  .mood-btn svg{ width:27px; height:27px; }
+  .mood-btn.selected{ background:var(--gold); transform:translateY(-3px) scale(1.08); box-shadow:0 8px 16px var(--shadow); }
+
+  /* ---------- highlight toolbar + editable entry ---------- */
+  .hl-toolbar{ display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+  .hl-btn{
+    display:flex; align-items:center; gap:6px;
+    border:2px solid var(--ink); border-radius:20px; padding:5px 12px;
+    font-size:.85rem; font-weight:700; background:var(--paper);
+  }
+  .hl-btn .swab{ width:14px; height:14px; border-radius:50%; border:1.5px solid var(--ink); }
+  .hl-btn.yellow .swab{ background:var(--hl-yellow); }
+  .hl-btn.green .swab{ background:var(--hl-green); }
+  .hl-btn.pink .swab{ background:var(--hl-pink); }
+  .hl-btn.blue .swab{ background:var(--hl-blue); }
+  .hl-btn.orange .swab{ background:var(--hl-orange); }
+  .hl-hint{ font-size:.8rem; color:var(--ink-soft); font-style:italic; }
+
+  .editable{
+    width:100%; min-height:220px;
+    border:none; background:transparent;
+    font-family:'Cormorant Garamond', serif; font-size:1.3rem; line-height:39px;
+    color:var(--ink); outline:none;
+  }
+  .editable:empty:before{ content: attr(data-placeholder); color:#BDAE8C; }
+  .editable mark{ padding:0 1px; border-radius:2px; }
+  .editable mark.hl-yellow{ background:var(--hl-yellow); }
+  .editable mark.hl-green{ background:var(--hl-green); }
+  .editable mark.hl-pink{ background:var(--hl-pink); }
+  .editable mark.hl-blue{ background:var(--hl-blue); }
+  .editable mark.hl-orange{ background:var(--hl-orange); }
+
+  .count{ font-size:.95rem; font-weight:700; color:var(--ink-soft); }
+  .count.bad{ color:#B5453A; }
+  .count.good{ color:#5B7A4C; }
+  .meta-row{ display:flex; justify-content:flex-end; align-items:center; margin-top:2px; font-size:.95rem; color:var(--ink-soft); }
+
+  .warn{ color:#B5453A; font-size:.85rem; margin-top:6px; display:none; }
+  .warn.show{ display:block; }
+
+  /* ---------- photo attachments ---------- */
+  .photo-section{ margin-top:14px; }
+  .photo-caption{ font-size:.85rem; color:var(--ink-soft); font-style:italic; font-family:'Cormorant Garamond',serif; margin:0 0 8px; }
+
+  /* Interactive overlay used while writing: covers the whole page so photos can be
+     placed anywhere alongside the text. pointer-events:none lets clicks reach the
+     text/buttons underneath except where a photo actually sits. */
+  .photo-overlay{ position:absolute; inset:0; pointer-events:none; z-index:3; }
+
+  /* Static board used in the confirm screen / bookshelf popup — a contained area
+     rather than a full-page overlay, since those views aren't for editing. */
+  .photo-board{
+    position:relative; width:100%; aspect-ratio: 2.6 / 1; min-height:120px;
+    border-radius:12px; margin-bottom:10px; background:rgba(255,255,255,.2);
+  }
+
+  .placed-photo{
+    position:absolute; border-radius:8px; overflow:hidden;
+    border:3px solid #fff; box-shadow:0 6px 14px var(--shadow);
+    cursor:grab; touch-action:none; user-select:none; pointer-events:auto;
+  }
+  .placed-photo.dragging{ cursor:grabbing; z-index:50; box-shadow:0 10px 22px var(--shadow); }
+  .placed-photo img{ width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+  .placed-photo .remove-x{
+    position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%;
+    background:rgba(80,67,56,.85); color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:14px; line-height:1; border:none; cursor:pointer; z-index:2;
+  }
+  .placed-photo .resize-handle{
+    position:absolute; right:-7px; bottom:-7px; width:18px; height:18px; border-radius:50%;
+    background:var(--gold); border:2px solid var(--ink); cursor:nwse-resize; z-index:2;
+  }
+  .add-photo-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    border:2px dashed var(--ink-soft); border-radius:10px; padding:8px 14px;
+    font-size:.92rem; font-weight:700; color:var(--ink-soft); cursor:pointer;
+  }
+  .add-photo-btn:hover{ border-color:var(--ink); color:var(--ink); }
+
+  .save-btn{
+    display:block; width:100%; margin-top:20px;
+    background:var(--sage); color:#2E3626;
+    border:2px solid var(--ink); border-radius:30px;
+    padding:15px; font-weight:900; font-size:1.1rem;
+    box-shadow:0 6px 14px var(--shadow);
+    transition:transform .12s ease, opacity .12s ease;
+  }
+  .save-btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .save-btn:not(:disabled):hover{ transform:translateY(-2px); }
+
+  .already-card{
+    background:var(--paper); border:2px solid var(--ink); border-radius:16px;
+    padding:40px 30px; text-align:center; box-shadow:0 12px 30px var(--shadow);
+  }
+  .already-card svg{ width:90px; height:90px; margin-bottom:8px; }
+  .view-page-btn{ margin-top:16px; background:var(--sky); border:2px solid var(--ink); border-radius:24px; padding:11px 22px; font-weight:800; }
+
+  /* ---------- CONFIRM SCREEN ---------- */
+  #confirm-screen .page{ text-align:center; padding:48px 34px; }
+  .confirm-image{
+    width:100%; max-width:480px; border:2px solid var(--ink); border-radius:14px;
+    box-shadow:0 12px 24px var(--shadow); margin:0 auto 20px; display:block;
+    animation: image-reveal .6s cubic-bezier(.22,.9,.32,1);
+  }
+  @keyframes image-reveal{ from{ opacity:0; transform:scale(.92) translateY(10px);} to{ opacity:1; transform:scale(1) translateY(0);} }
+  @media (prefers-reduced-motion: reduce){ .confirm-image{ animation:none; } }
+  .to-shelf-btn{ margin-top:20px; background:var(--gold); color:var(--paper); border:2px solid var(--ink); border-radius:26px; padding:13px 28px; font-weight:900; transition:transform .15s ease; }
+  .to-shelf-btn:hover{ transform:translateY(-2px); }
+
+  /* ---------- SHELF / COLLECTION ---------- */
+  .shelf-header{ display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .shelf-header h2{ margin:0; font-size:2rem; }
+  .shelf-empty{ background:var(--paper); border:2px dashed var(--ink-soft); border-radius:14px; padding:36px 20px; text-align:center; color:var(--ink-soft); }
+  .plank{
+    background:linear-gradient(180deg, #D8C39A, #C6AD7C);
+    border:2px solid var(--ink); border-radius:6px;
+    padding:16px 12px 0; margin-bottom:0;
+    display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; min-height:104px; position:relative;
+  }
+  .plank::after{ content:""; display:block; height:10px; width:100%; background:#B69A68; border-top:2px solid var(--ink); margin-top:14px; }
+  .plank + .plank{ margin-top:24px; }
+  .mini-book{
+    width:38px; height:86px; border:2px solid var(--ink); border-radius:4px 4px 0 0;
+    display:flex; align-items:flex-start; justify-content:center; padding-top:6px;
+    font-family:'Caveat',cursive; font-weight:700; font-size:.9rem;
+    transition:transform .1s ease;
+  }
+  .mini-book:hover{ transform:translateY(-6px); }
+  .shelf-grid-scroll{ max-height:480px; overflow-y:auto; padding-right:2px; }
+
+  .modal-back{ position:fixed; inset:0; background:rgba(74,64,52,.5); display:none; align-items:center; justify-content:center; padding:24px; z-index:10; }
+  .modal-back.show{ display:flex; }
+  .modal-card{
+    background:var(--paper); border:2px solid var(--ink); border-radius:18px;
+    max-width:640px; width:100%; padding:28px; box-shadow:0 16px 34px var(--shadow);
+    max-height:88vh; overflow-y:auto;
+  }
+  .modal-image{ width:100%; max-height:340px; object-fit:cover; border-radius:12px; margin-bottom:14px; border:2px solid var(--ink); }
+  .modal-card h3{ margin:0 0 2px; font-size:1.8rem; }
+  .modal-card .date-sub{ color:var(--ink-soft); margin:0 0 12px; font-size:1rem; font-family:'Cormorant Garamond',serif; font-style:italic; }
+  .modal-text{ font-family:'Cormorant Garamond', serif; font-size:1.2rem; line-height:1.6; max-height:220px; overflow-y:auto; }
+  .tags{ margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+  .tags span{ background:var(--sky); border:2px solid var(--ink); border-radius:20px; padding:4px 12px; font-size:.85rem; font-weight:700; }
+  .modal-close{ display:block; margin:16px auto 0; background:var(--rose); border:2px solid var(--ink); border-radius:24px; padding:9px 24px; font-weight:800; }
+
+  /* ---------- AUTH SCREEN (login / signup) ---------- */
+  #auth-screen{ padding-top:10px; }
+  .auth-card{
+    background:var(--paper); border:2px solid var(--ink); border-radius:18px;
+    padding:42px 40px; box-shadow:0 12px 30px var(--shadow);
+    background-image: repeating-linear-gradient(var(--paper) 0 38px, var(--paper-line) 38px 39px);
+    background-position: 0 80px;
+    text-align:center; max-width:480px; margin:0 auto;
+  }
+  .auth-quill{ width:52px; height:52px; margin-bottom:6px; }
+  .auth-card h1{ margin:0 0 2px; font-size:2.4rem; }
+  .auth-card .tag{ margin:0 0 24px; color:var(--ink-soft); font-size:1.1rem; font-family:'Cormorant Garamond',serif; font-style:italic; }
+  .field-label{ display:block; text-align:left; font-family:'Caveat',cursive; font-weight:700; margin:16px 0 5px; font-size:1.1rem; color:var(--ink); }
+  .field-input{
+    width:100%; box-sizing:border-box; background:rgba(255,255,255,.6);
+    border:2px solid var(--ink); border-radius:10px; padding:11px 14px;
+    font-family:'Cormorant Garamond',serif; font-size:1.15rem; color:var(--ink); outline:none;
+  }
+  .field-input::placeholder{ color:#BDAE8C; }
+  .field-input:focus{ background:#fff; box-shadow:0 0 0 3px rgba(191,160,107,.35); }
+  .auth-error{ display:none; text-align:left; background:#F3E2D8; border:2px dashed var(--rose); padding:9px 14px; margin-top:14px; font-size:.92rem; border-radius:8px; }
+  .auth-error.show{ display:block; }
+  .auth-submit{
+    display:block; width:100%; margin-top:22px; background:var(--gold); color:var(--paper);
+    border:2px solid var(--ink); border-radius:26px; padding:14px; font-weight:900; font-size:1.1rem;
+    box-shadow:0 6px 14px var(--shadow); transition:transform .12s ease;
+  }
+  .auth-submit:hover{ transform:translateY(-2px); }
+  .auth-submit:disabled{ opacity:.5; cursor:not-allowed; transform:none; }
+  .auth-switch{ margin:18px 0 0; font-family:'Cormorant Garamond',serif; font-size:1rem; color:var(--ink-soft); }
+  .auth-switch button{ background:none; border:none; text-decoration:underline; color:var(--ink); font-weight:700; font-size:1rem; cursor:pointer; padding:0 0 0 4px; font-family:'Cormorant Garamond',serif; }
+
+  /* ---------- COVER (personalized) ---------- */
+  .cover-actions{ display:flex; gap:14px; justify-content:center; margin-top:22px; }
+  .cover-action-btn{
+    display:flex; align-items:center; gap:6px;
+    background:var(--paper); border:2px solid var(--ink); border-radius:24px; padding:10px 20px;
+    font-family:'Caveat',cursive; font-weight:700; font-size:1.05rem;
+    box-shadow:0 3px 8px var(--shadow); transition:transform .12s ease;
+  }
+  .cover-action-btn svg{ width:18px; height:18px; }
+  .cover-action-btn:hover{ transform:translateY(-2px); }
+  .cover-action-btn.logout{ background:#EAD9C8; }
+
+  /* ---------- CUSTOMIZE COVER SCREEN ---------- */
+  .customize-card{ background:var(--paper); border:2px solid var(--ink); border-radius:18px; padding:32px 34px; box-shadow:0 12px 30px var(--shadow); }
+  .customize-card h2{ margin:0 0 18px; font-size:2rem; }
+  .preview-cover{ padding:30px 20px 38px; margin-bottom:22px; text-align:center; border:2px solid var(--ink); border-radius:14px; position:relative; transition:background .2s ease; }
+  .preview-cover h3{ margin:0 0 4px; font-size:1.7rem; }
+  .preview-cover svg{ width:56%; margin:8px auto 0; display:block; }
+  .picker-label{ font-weight:800; margin:18px 0 9px; font-size:.95rem; color:var(--ink-soft); }
+  .swatch-row{ display:flex; gap:11px; flex-wrap:wrap; }
+  .swatch{ width:40px; height:40px; border-radius:50%; border:2px solid var(--ink); cursor:pointer; }
+  .swatch.selected{ box-shadow:0 0 0 3px var(--paper), 0 0 0 6px var(--ink); }
+  .icon-pick-row{ display:flex; gap:11px; flex-wrap:wrap; }
+  .icon-pick{ width:48px; height:48px; border:2px solid var(--ink); border-radius:50%; background:var(--cream); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .icon-pick svg{ width:25px; height:25px; }
+  .icon-pick.selected{ background:var(--gold); }
+  .pattern-row{ display:flex; gap:11px; flex-wrap:wrap; }
+  .pattern-pick{ width:48px; height:48px; border:2px solid var(--ink); border-radius:8px; cursor:pointer; background:var(--cream); }
+  .pattern-pick.selected{ box-shadow:0 0 0 3px var(--gold); }
+  .customize-save{ display:block; width:100%; margin-top:22px; background:var(--sage); color:#2E3626; border:2px solid var(--ink); border-radius:26px; padding:14px; font-weight:900; font-size:1.1rem; box-shadow:0 6px 14px var(--shadow); }
+
+  /* ---------- MOBILE RESPONSIVE ---------- */
+  @media (max-width: 640px){
+    body{ padding:56px 12px 28px; }
+    #string-lights{ height:48px; }
+    .app{ max-width:100%; }
+    .page, .auth-card, .customize-card{ padding:24px 18px; }
+    #cover-screen .book{ padding:32px 20px 40px; }
+    #cover-screen h1{ font-size:2.3rem; }
+    #cover-screen p.tag{ font-size:1rem; }
+    .cover-doodle{ width:70%; }
+    .page h2{ font-size:1.6rem; }
+    .editable{ font-size:1.1rem; line-height:32px; min-height:180px; }
+    .mood-btn{ width:46px; height:46px; }
+    .mood-btn svg{ width:22px; height:22px; }
+    .hl-toolbar{ gap:6px; }
+    .hl-btn{ padding:4px 9px; font-size:.78rem; }
+    .hl-hint{ display:none; }
+    .top-row{ flex-wrap:wrap; gap:8px; }
+    .streak-pill{ font-size:.9rem; padding:6px 12px 6px 8px; }
+    .confirm-image{ max-width:100%; }
+    .modal-card{ padding:18px; max-width:94vw; }
+    .modal-image{ max-height:220px; }
+    
+    .cover-actions{ flex-direction:column; align-items:center; gap:10px; }
+    .swatch-row, .pattern-row, .icon-pick-row{ justify-content:center; }
+  }
+</style>
+</head>
+<body>
+
+<div id="string-lights"></div>
+<svg class="corner-deco tl" viewBox="0 0 150 150" id="deco-tl"></svg>
+<svg class="corner-deco tr" viewBox="0 0 150 150" id="deco-tr"></svg>
+<svg class="corner-deco bl" viewBox="0 0 150 150" id="deco-bl"></svg>
+<svg class="corner-deco br" viewBox="0 0 150 150" id="deco-br"></svg>
+
+<div class="app">
+
+  <!-- AUTH (LOGIN / SIGNUP) -->
+  <section id="auth-screen" class="screen active">
+    <div class="auth-card wobble">
+      <svg class="auth-quill" viewBox="0 0 60 60" fill="none" stroke="#4A4034" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M44 8 C50 8 54 12 54 18 C54 26 40 40 26 48 L14 52 L18 40 C26 26 36 8 44 8Z" fill="#BFA06B"/>
+        <path d="M18 40 L28 30" />
+        <path d="M14 52 L10 56" stroke-width="3"/>
+      </svg>
+      <h1 id="auth-title">Welcome</h1>
+      <p class="tag" id="auth-tag">sign up to start your journal</p>
+
+      <label class="field-label" id="name-field-label" for="auth-name">Your name</label>
+      <input class="field-input" id="auth-name" type="text" placeholder="e.g. Rija" autocomplete="name"/>
+
+      <label class="field-label">Email</label>
+      <input class="field-input" id="auth-email" type="email" placeholder="you@email.com" autocomplete="email"/>
+
+      <label class="field-label">Password</label>
+      <input class="field-input" id="auth-password" type="password" placeholder="At least 6 characters" autocomplete="new-password"/>
+
+      <div class="auth-error" id="auth-error"></div>
+
+      <button class="auth-submit wobble2" id="auth-submit">Create my journal</button>
+      <p class="auth-switch">
+        <span id="auth-switch-text">Already have a journal?</span>
+        <button id="auth-switch-btn">Log in</button>
+      </p>
+    </div>
+  </section>
+
+  <!-- COVER -->
+  <section id="cover-screen" class="screen">
+    <div class="book wobble" id="cover-book">
+      <h1><span id="cover-owner-name">Your</span>'s Journal</h1>
+      <p class="tag">one page a day, a keepsake for every mood</p>
+      <svg class="cover-doodle" id="cover-doodle-svg" viewBox="0 0 200 120" fill="none" stroke="#4A4034" stroke-width="3" stroke-linecap="round"></svg>
+      <button id="open-btn" class="wobble2">Open my journal</button>
+    </div>
+    <div class="cover-actions">
+      <button class="cover-action-btn" id="customize-link-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4A4034" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+        Customize
+      </button>
+      <button class="cover-action-btn logout" id="logout-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4A4034" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        Log out
+      </button>
+    </div>
+  </section>
+
+  <!-- CUSTOMIZE COVER -->
+  <section id="customize-screen" class="screen">
+    <div class="customize-card wobble2">
+      <h2 class="hand">Make it yours</h2>
+
+      <div class="preview-cover" id="preview-cover">
+        <h3 id="preview-name">Your's Journal</h3>
+        <svg id="preview-icon-svg" viewBox="0 0 200 120" fill="none" stroke="#4A4034" stroke-width="3" stroke-linecap="round"></svg>
+      </div>
+
+      <div class="picker-label">Cover colour</div>
+      <div class="swatch-row" id="color-picker"></div>
+
+      <div class="picker-label">Cover print</div>
+      <div class="pattern-row" id="pattern-picker"></div>
+
+      <div class="picker-label">Cover image</div>
+      <div class="icon-pick-row" id="icon-picker"></div>
+
+      <button class="customize-save wobble2" id="customize-save-btn">Save cover</button>
+    </div>
+  </section>
+
+  <!-- TODAY / WRITE -->
+  <section id="write-screen" class="screen">
+    <div class="top-row">
+      <button class="icon-btn" id="back-to-cover-btn" title="Back to cover">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4A4034" stroke-width="2.5"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <div class="streak-pill wobble2">
+        <svg class="streak-flicker" viewBox="0 0 24 24" fill="#C79992" stroke="#4A4034" stroke-width="1.5"><path d="M12 2c1 4-4 5-4 10a4 4 0 0 0 8 0c0-2-1-3-1-3s2 1 2 5a6 6 0 1 1-12 0c0-6 6-6 5-14 1 0 2 1 2 2z"/></svg>
+        <span id="streak-count" class="hand">0 day streak</span>
+      </div>
+      <button class="icon-btn" id="to-shelf-btn" title="Your bookshelf">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4A4034" stroke-width="2"><rect x="3" y="4" width="6" height="16"/><rect x="10" y="7" width="6" height="13"/><rect x="17" y="2" width="4" height="18"/></svg>
+      </button>
+    </div>
+
+    <div class="notebook">
+      <!-- WRITE FORM -->
+      <div id="entry-form" class="page">
+        <div class="photo-overlay" id="photo-layer"></div>
+
+        <div class="top-row" style="margin-bottom:2px;">
+          <h2 style="margin:0;">How was today?</h2>
+          <span id="word-count" class="count">0/100</span>
+        </div>
+        <p class="date-sub" id="today-label"></p>
+
+        <div class="mood-row" id="mood-row"></div>
+
+        <div class="hl-toolbar">
+          <button type="button" class="hl-btn yellow" id="hl-yellow-btn"><span class="swab"></span>Highlight</button>
+          <button type="button" class="hl-btn green" id="hl-green-btn"><span class="swab"></span>Highlight</button>
+          <button type="button" class="hl-btn pink" id="hl-pink-btn"><span class="swab"></span>Highlight</button>
+          <button type="button" class="hl-btn blue" id="hl-blue-btn"><span class="swab"></span>Highlight</button>
+          <button type="button" class="hl-btn orange" id="hl-orange-btn"><span class="swab"></span>Highlight</button>
+          <span class="hl-hint">select text, then click a colour · click a highlighted word to clear it</span>
+        </div>
+
+        <div class="editable" id="entry-text" contenteditable="true" data-placeholder="Write 50–500 words about your day, in English, in the order things happened..."></div>
+
+        <div class="meta-row">
+          <span id="mood-echo" class="hand"></span>
+        </div>
+        <div class="warn" id="warn-box"></div>
+
+        <div class="photo-section">
+          <p class="photo-caption">Drag a photo anywhere on the page · drag the gold corner dot to resize</p>
+          <label class="add-photo-btn" for="photo-input">📎 Add a photo (up to 3)</label>
+          <input type="file" id="photo-input" accept="image/*" multiple style="display:none"/>
+        </div>
+
+        <button class="save-btn wobble2" id="save-btn" disabled>Turn today into a page ✎</button>
+      </div>
+
+      <!-- ALREADY WROTE TODAY -->
+      <div id="already-card" class="already-card" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4A4034" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <h3 class="hand">Today's page is already in the book</h3>
+        <p style="color:var(--ink-soft)" class="serif">Come back tomorrow to add the next one.</p>
+        <button class="view-page-btn wobble2" id="view-today-btn">See today's page</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONFIRM -->
+  <section id="confirm-screen" class="screen">
+    <div class="page">
+      <img id="confirm-image" class="confirm-image" alt="today's generated page image" style="cursor:zoom-in;" title="Click to view full size"/>
+      <div class="photo-board" id="confirm-photos"></div>
+      <h2 class="hand">A new page for your book!</h2>
+      <p style="color:var(--ink-soft)" class="serif">Streak is now <span id="confirm-streak"></span> days.</p>
+      <button class="to-shelf-btn wobble2" id="confirm-shelf-btn">See my bookshelf</button>
+    </div>
+  </section>
+
+  <!-- SHELF -->
+  <section id="shelf-screen" class="screen">
+    <div class="shelf-header">
+      <button class="icon-btn" id="back-to-write-btn"><svg viewBox="0 0 24 24" fill="none" stroke="#4A4034" stroke-width="2.5"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <h2 class="hand">Your bookshelf</h2>
+    </div>
+    <div id="shelf-empty" class="shelf-empty hand" style="display:none;">No pages yet — write your first entry and it'll show up here.</div>
+    <div class="shelf-grid-scroll"><div id="shelf-planks"></div></div>
+  </section>
+
+</div>
+
+<div class="modal-back" id="modal-back">
+  <div class="modal-card">
+    <img id="modal-image" class="modal-image" alt="page image" style="cursor:zoom-in;" title="Click to view full size"/>
+    <h3 class="hand" id="modal-date"></h3>
+    <p class="date-sub" id="modal-mood"></p>
+    <div class="modal-text" id="modal-text"></div>
+    <div class="photo-board" id="modal-photos"></div>
+    <div class="tags" id="modal-tags"></div>
+    <button class="modal-close wobble2" id="modal-close">Close</button>
+  </div>
+</div>
+
+<div class="modal-back" id="lightbox-back" style="z-index:20;">
+  <img id="lightbox-image" alt="expanded page image" style="max-width:92vw; max-height:88vh; object-fit:contain; border-radius:14px; border:2px solid var(--paper); box-shadow:0 20px 50px rgba(0,0,0,.4); cursor:zoom-out;"/>
+</div>
+
+<script>
+/* ---------------- moods ---------------- */
+const MOODS = {
+  sunny:  { label:'Sunny',  color:'#D8A8A0', icon:m=>`<circle cx="12" cy="12" r="6"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>` },
+  cloudy: { label:'Cloudy', color:'#9CB6BE', icon:m=>`<path d="M7 18a4 4 0 0 1-.5-7.97A5 5 0 0 1 16 8a4 4 0 0 1 1 7.9"/>` },
+  rainy:  { label:'Rainy',  color:'#8C93B0', icon:m=>`<path d="M7 16a4 4 0 0 1-.5-7.97A5 5 0 0 1 16 6a4 4 0 0 1 1 7.9"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/>` },
+  stormy: { label:'Stormy', color:'#8C7F68', icon:m=>`<path d="M7 14a4 4 0 0 1-.5-7.97A5 5 0 0 1 16 4a4 4 0 0 1 1 7.9"/><path d="M12 14l-3 5h4l-2 4"/>` },
+  cozy:   { label:'Cozy',   color:'#A3AE8C', icon:m=>`<path d="M4 10l8-6 8 6"/><path d="M6 9v10h12V9"/><path d="M10 19v-5h4v5"/>` },
+};
+const STOP = new Set(("the a an and or but so to of in on at is was were be been being it i my me we our you your he she they them this that with for as not just very really today day went went felt feel felt had have has do did going get got make made").split(' '));
+
+/* ---------------- cover customization options ---------------- */
+function petalFlowerSVG(cx, cy, r, petalColor, centerColor){
+  let petals = '';
+  for(let i=0; i<6; i++){
+    petals += `<ellipse cx="${cx}" cy="${cy-r}" rx="${r*0.55}" ry="${r}" fill="${petalColor}" fill-opacity=".8" stroke="#4A4034" stroke-width="1.2" transform="rotate(${i*60} ${cx} ${cy})"/>`;
+  }
+  return `${petals}<circle cx="${cx}" cy="${cy}" r="${r*0.5}" fill="${centerColor}" stroke="#4A4034" stroke-width="1.5"/>`;
+}
+const COVER_ICONS = {
+  moonStars: `<path d="M118 22 A26 26 0 1 0 118 74 A19 19 0 1 1 118 22Z" fill="#BFA06B" stroke="#4A4034" stroke-width="2"/>
+    <path d="M52 32l4 9 9 4-9 4-4 9-4-9-9-4 9-4z" fill="#4A4034"/>
+    <path d="M158 58l3 6 6 3-6 3-3 6-3-6-6-3 6-3z" fill="#4A4034"/>`,
+  flower: petalFlowerSVG(100, 58, 22, '#C79992', '#F1E2A0'),
+  butterfly: `<ellipse cx="80" cy="52" rx="22" ry="30" fill="#C79992" fill-opacity=".7" stroke="#4A4034" stroke-width="2" transform="rotate(-18 80 52)"/>
+    <ellipse cx="120" cy="52" rx="22" ry="30" fill="#C79992" fill-opacity=".7" stroke="#4A4034" stroke-width="2" transform="rotate(18 120 52)"/>
+    <line x1="100" y1="30" x2="100" y2="78" stroke="#4A4034" stroke-width="2.5"/>
+    <path d="M100 30q-6-10 -12-12M100 30q6-10 12-12" stroke="#4A4034" stroke-width="1.5" fill="none"/>`,
+  heart: `<path d="M100 92 C60 65,42 44,42 26 C42 8,60 0,78 10 C90 17,97 26,100 34 C103 26,110 17,122 10 C140 0,158 8,158 26 C158 44,140 65,100 92Z" fill="#C79992" stroke="#4A4034" stroke-width="2" stroke-linejoin="round"/>`,
+  cassette: `<rect x="42" y="30" width="116" height="70" rx="10" fill="#F1E9D6" stroke="#4A4034" stroke-width="2.5"/>
+    <circle cx="76" cy="65" r="16" fill="#FBF8F1" stroke="#4A4034" stroke-width="2.5"/>
+    <circle cx="124" cy="65" r="16" fill="#FBF8F1" stroke="#4A4034" stroke-width="2.5"/>
+    <circle cx="76" cy="65" r="5" fill="#4A4034"/>
+    <circle cx="124" cy="65" r="5" fill="#4A4034"/>
+    <rect x="86" y="45" width="28" height="10" rx="3" fill="#FBF8F1" stroke="#4A4034" stroke-width="1.8"/>`,
+  camera: `<rect x="55" y="45" width="90" height="55" rx="8" fill="#fff" stroke="#4A4034" stroke-width="2"/>
+    <rect x="80" y="30" width="30" height="16" rx="3" fill="#fff" stroke="#4A4034" stroke-width="2"/>
+    <circle cx="100" cy="73" r="18" fill="#fff" stroke="#4A4034" stroke-width="2"/><circle cx="100" cy="73" r="9" fill="#4A4034" fill-opacity=".15" stroke="#4A4034" stroke-width="2"/>
+    <circle cx="132" cy="55" r="3" fill="#4A4034"/>`,
+};
+const COVER_COLORS = ['#EFE6D0','#E8C4C8','#C9B8D4','#AEBB9C','#A9C4CC','#E8C9AC','#C4A672','#FFFFFF'];
+const COVER_PATTERNS = {
+  none:    ()=> 'linear-gradient(160deg, #EFE6D0, #DDCBA0)',
+  solid:   (c)=> c,
+  dots:    (c)=> `${c} radial-gradient(circle, rgba(74,64,52,.22) 2px, transparent 2.5px) 0 0/16px 16px`,
+  stripes: (c)=> `repeating-linear-gradient(135deg, rgba(74,64,52,.1) 0 8px, transparent 8px 18px), ${c}`,
+  confetti:(c)=> `radial-gradient(circle at 20% 30%, rgba(74,64,52,.25) 2px, transparent 3px) 0 0/26px 26px,
+                   radial-gradient(circle at 70% 60%, rgba(74,64,52,.2) 2px, transparent 3px) 8px 12px/26px 26px, ${c}`,
+  waves:   (c)=> `repeating-radial-gradient(circle at 0 100%, transparent 0 10px, rgba(74,64,52,.1) 10px 12px), ${c}`,
+};
+const PATTERN_LABELS = { none:'No print', solid:'Solid', dots:'Dots', stripes:'Stripes', confetti:'Confetti', waves:'Waves' };
+function iconSvgMarkup(key, viewBox='0 0 200 120'){
+  return `<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#4A4034" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${COVER_ICONS[key]||COVER_ICONS.moonStars}</svg>`;
+}
+
+/* ---------------- original decorative vector art (not stock images) ---------------- */
+function stringLightsSVG(){
+  const w = 1400, h = 64, n = 11;
+  let bulbs = '';
+  let wire = `M0 8`;
+  const pts = [];
+  for(let i=0;i<=n;i++){
+    const x = (w/n)*i;
+    const y = 10 + Math.sin(i*0.9)*10 + 8;
+    pts.push([x,y]);
+  }
+  for(let i=1;i<pts.length;i++){
+    const [px,py] = pts[i-1], [x,y] = pts[i];
+    const mx = (px+x)/2;
+    wire += ` Q${mx} ${py+18} ${x} ${y}`;
+  }
+  const colors = ['#F1E2A0','#D8A8A0','#F1E2A0','#C6D8AE','#F1E2A0','#D8A8A0','#F1E2A0','#C6D8AE','#F1E2A0','#D8A8A0','#F1E2A0'];
+  pts.forEach(([x,y],i)=>{
+    bulbs += `<circle cx="${x}" cy="${y+14}" r="10" fill="${colors[i%colors.length]}" opacity=".35"/>
+               <line x1="${x}" y1="${y}" x2="${x}" y2="${y+7}" stroke="#4A4034" stroke-width="1.5"/>
+               <circle cx="${x}" cy="${y+12}" r="5.5" fill="${colors[i%colors.length]}" stroke="#4A4034" stroke-width="1.2"/>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="${wire}" fill="none" stroke="#4A4034" stroke-width="1.5" opacity=".55"/>
+    ${bulbs}
+  </svg>`;
+}
+
+function decoFlowerSprig(){
+  return `<g fill="none" stroke="#4A4034" stroke-width="1.6" stroke-linecap="round">
+    <path d="M30 140 Q38 95 48 60"/>
+    <path d="M40 108 q-12 -5 -18 -15M43 92 q12 -4 18 -12M46 76 q-10 -4 -14 -12"/>
+    ${petalFlowerSVG(52, 48, 16, '#C79992', '#F1E2A0')}
+  </g>`;
+}
+function decoEnvelopes(){
+  return `<g stroke="#4A4034" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="18" y="55" width="90" height="58" rx="4" fill="#E9DFC9"/>
+    <path d="M18 55l45 34 45-34" fill="none"/>
+    <rect x="32" y="42" width="90" height="58" rx="4" fill="#FBF8F1"/>
+    <path d="M32 42l45 34 45-34" fill="none"/>
+    <circle cx="77" cy="71" r="9" fill="#C79992" stroke-width="1.4"/>
+    <path d="M69 71h16M77 63v16" stroke-width="1.4"/>
+  </g>`;
+}
+function decoQuillInk(){
+  return `<g stroke="#4A4034" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="28" y="104" width="42" height="30" rx="3" fill="#3A332A"/>
+    <ellipse cx="49" cy="104" rx="10" ry="4" fill="#2A241D"/>
+    <path d="M55 100 C82 76,108 48,118 22 C98 30,76 52,58 82 C52 90,50 96,55 100Z" fill="#C6AD7C" fill-opacity=".75"/>
+    <path d="M55 100 C82 76,108 48,118 22" fill="none" stroke-width="1.2"/>
+  </g>`;
+}
+function decoBouquet(){
+  return `<g fill="none" stroke="#4A4034" stroke-width="1.6" stroke-linecap="round">
+    <path d="M70 138 L62 66 M70 138 L74 60 M70 138 L82 68"/>
+    ${petalFlowerSVG(62, 56, 13, '#D8A8A0', '#F1E2A0')}
+    ${petalFlowerSVG(78, 52, 12, '#EFE6D0', '#C79992')}
+    ${petalFlowerSVG(72, 70, 11, '#C79992', '#F1E2A0')}
+    <circle cx="70" cy="118" r="9" fill="#D8C9A8" stroke="#4A4034" stroke-width="1.4"/>
+    <path d="M62 118h16" stroke-width="1.4"/>
+  </g>`;
+}
+
+let state = { mood:null, entriesCache:null, attachedImages:[] };
+
+/* ---------------- helpers ---------------- */
+function todayKey(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function prettyDate(key){
+  const [y,m,d] = key.split('-').map(Number);
+  return new Date(y, m-1, d).toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+}
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function moodIconSVG(key, size=27){
+  const m = MOODS[key];
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="#4A4034" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${m.icon()}</svg>`;
+}
+function doodleSceneSVG(mood, keywords){
+  const m = MOODS[mood] || MOODS.sunny;
+  const label = (keywords||[]).join(' · ');
+  return `
+  <rect x="1" y="1" width="98" height="98" rx="8" fill="${m.color}33" stroke="#4A4034" stroke-width="2"/>
+  <path d="M6 70 Q 25 55 45 68 Q 65 50 94 66" fill="none" stroke="#4A4034" stroke-width="2.5"/>
+  <text x="50" y="90" text-anchor="middle" font-family="Caveat,cursive" font-size="8" fill="#4A4034">${label}</text>`;
+}
+
+/* ---------------- auth (real backend) ---------------- */
+const BACKEND_URL = 'https://journal-app-85v2.onrender.com';
+
+function getToken(){ return localStorage.getItem('authToken'); }
+function setToken(token){ localStorage.setItem('authToken', token); }
+function clearToken(){ localStorage.removeItem('authToken'); }
+function getCachedUser(){
+  try{ return JSON.parse(localStorage.getItem('currentUser')); }catch(e){ return null; }
+}
+function setCachedUser(user){ localStorage.setItem('currentUser', JSON.stringify(user)); }
+
+async function apiFetch(path, options={}){
+  const token = getToken();
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers||{}),
+    },
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok){ const err = new Error(data.error || 'Request failed'); err.status = res.status; throw err; }
+  return data;
+}
+
+function getCurrentUser(){ return getCachedUser(); }
+
+let authMode = 'signup';
+const authTitle = document.getElementById('auth-title');
+const authTag = document.getElementById('auth-tag');
+const authNameLabel = document.getElementById('name-field-label');
+const authNameInput = document.getElementById('auth-name');
+const authEmailInput = document.getElementById('auth-email');
+const authPasswordInput = document.getElementById('auth-password');
+const authError = document.getElementById('auth-error');
+const authSubmit = document.getElementById('auth-submit');
+const authSwitchText = document.getElementById('auth-switch-text');
+const authSwitchBtn = document.getElementById('auth-switch-btn');
+
+function renderAuthMode(){
+  authError.classList.remove('show');
+  if(authMode==='signup'){
+    authTitle.textContent = 'Welcome';
+    authTag.textContent = 'sign up to start your journal';
+    authNameLabel.style.display = 'block';
+    authNameInput.style.display = 'block';
+    authSubmit.textContent = 'Create my journal';
+    authSwitchText.textContent = 'Already have a journal?';
+    authSwitchBtn.textContent = 'Log in';
+  } else {
+    authTitle.textContent = 'Welcome back';
+    authTag.textContent = 'log in to your journal';
+    authNameLabel.style.display = 'none';
+    authNameInput.style.display = 'none';
+    authSubmit.textContent = 'Log in';
+    authSwitchText.textContent = "Don't have a journal yet?";
+    authSwitchBtn.textContent = 'Sign up';
+  }
+}
+authSwitchBtn.addEventListener('click', ()=>{
+  authMode = authMode==='signup' ? 'login' : 'signup';
+  renderAuthMode();
+});
+
+authSubmit.addEventListener('click', async ()=>{
+  const firstName = authNameInput.value.trim();
+  const email = authEmailInput.value.trim().toLowerCase();
+  const password = authPasswordInput.value;
+
+  if(!email || !password || (authMode==='signup' && !firstName)){
+    authError.textContent = 'Please fill in every field.';
+    authError.classList.add('show');
+    return;
+  }
+
+  const originalLabel = authSubmit.textContent;
+  authSubmit.disabled = true;
+  authSubmit.textContent = 'One moment...';
+
+  try{
+    const data = authMode==='signup'
+      ? await apiFetch('/api/signup', { method:'POST', body: JSON.stringify({ firstName, email, password }) })
+      : await apiFetch('/api/login', { method:'POST', body: JSON.stringify({ email, password }) });
+
+    setToken(data.token);
+    setCachedUser(data.user);
+    state.entriesCache = null;
+    authNameInput.value = ''; authEmailInput.value = ''; authPasswordInput.value = '';
+    await renderCoverScreen();
+    show('cover-screen');
+  }catch(err){
+    authError.textContent = err.message;
+    authError.classList.add('show');
+  }finally{
+    authSubmit.disabled = false;
+    authSubmit.textContent = originalLabel;
+  }
+});
+
+document.getElementById('logout-btn').addEventListener('click', ()=>{
+  clearToken();
+  localStorage.removeItem('currentUser');
+  state.entriesCache = null;
+  authMode = 'login';
+  renderAuthMode();
+  show('auth-screen');
+});
+
+/* ---------------- cover preferences ---------------- */
+async function getCoverPrefs(){
+  try{ return await apiFetch('/api/cover-prefs'); }
+  catch(e){ return { color:'#EFE6D0', pattern:'none', icon:'moonStars' }; }
+}
+async function saveCoverPrefs(prefs){
+  return apiFetch('/api/cover-prefs', { method:'PUT', body: JSON.stringify(prefs) });
+}
+
+async function renderCoverScreen(){
+  const user = getCurrentUser();
+  if(!user) return;
+  const prefs = await getCoverPrefs();
+  document.getElementById('cover-owner-name').textContent = user.firstName;
+  document.getElementById('cover-doodle-svg').innerHTML = COVER_ICONS[prefs.icon] || COVER_ICONS.moonStars;
+  const bg = COVER_PATTERNS[prefs.pattern] ? COVER_PATTERNS[prefs.pattern](prefs.color) : prefs.color;
+  document.getElementById('cover-book').style.background = bg;
+}
+
+/* ---------------- customize cover screen ---------------- */
+let customizeDraft = null;
+document.getElementById('customize-link-btn').addEventListener('click', async ()=>{
+  const user = getCurrentUser();
+  if(!user) return;
+  customizeDraft = await getCoverPrefs();
+  renderCustomizeScreen(user);
+  show('customize-screen');
+});
+
+function renderCustomizeScreen(user){
+  document.getElementById('preview-name').textContent = `${user.firstName}'s Journal`;
+  document.getElementById('preview-icon-svg').innerHTML = COVER_ICONS[customizeDraft.icon] || COVER_ICONS.moonStars;
+  const preview = document.getElementById('preview-cover');
+  preview.style.background = COVER_PATTERNS[customizeDraft.pattern](customizeDraft.color);
+
+  const colorPicker = document.getElementById('color-picker');
+  colorPicker.innerHTML = '';
+  COVER_COLORS.forEach(c=>{
+    const sw = document.createElement('div');
+    sw.className = 'swatch' + (c===customizeDraft.color ? ' selected' : '');
+    sw.style.background = c;
+    sw.addEventListener('click', ()=>{ customizeDraft.color = c; renderCustomizeScreen(user); });
+    colorPicker.appendChild(sw);
+  });
+
+  const patternPicker = document.getElementById('pattern-picker');
+  patternPicker.innerHTML = '';
+  Object.keys(COVER_PATTERNS).forEach(p=>{
+    const sw = document.createElement('div');
+    sw.className = 'pattern-pick' + (p===customizeDraft.pattern ? ' selected' : '');
+    sw.style.background = COVER_PATTERNS[p](customizeDraft.color);
+    sw.title = PATTERN_LABELS[p] || p;
+    sw.addEventListener('click', ()=>{ customizeDraft.pattern = p; renderCustomizeScreen(user); });
+    patternPicker.appendChild(sw);
+  });
+
+  const iconPicker = document.getElementById('icon-picker');
+  iconPicker.innerHTML = '';
+  Object.keys(COVER_ICONS).forEach(key=>{
+    const btn = document.createElement('div');
+    btn.className = 'icon-pick' + (key===customizeDraft.icon ? ' selected' : '');
+    btn.innerHTML = iconSvgMarkup(key, '0 0 200 120');
+    btn.title = key;
+    btn.addEventListener('click', ()=>{ customizeDraft.icon = key; renderCustomizeScreen(user); });
+    iconPicker.appendChild(btn);
+  });
+}
+document.getElementById('customize-save-btn').addEventListener('click', async ()=>{
+  const user = getCurrentUser();
+  if(!user) return;
+  await saveCoverPrefs(customizeDraft);
+  await renderCoverScreen();
+  show('cover-screen');
+});
+
+/* ---------------- entries (real backend) ---------------- */
+async function getAllEntries(){
+  if(state.entriesCache) return state.entriesCache;
+  const user = getCurrentUser();
+  if(!user) return {};
+  try{
+    const entries = await apiFetch('/api/entries');
+    state.entriesCache = entries;
+    return entries;
+  }catch(e){ console.error('Could not load entries:', e); return {}; }
+}
+function invalidateEntriesCache(){ state.entriesCache = null; }
+
+function computeStreak(entries){
+  let streak = 0;
+  let d = new Date();
+  let key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  // If today hasn't been written yet, that alone shouldn't zero out the streak —
+  // start checking from yesterday instead, so the count reflects consecutive
+  // completed days rather than requiring today specifically.
+  if(!entries[key]) d.setDate(d.getDate()-1);
+  while(true){
+    key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if(entries[key]){ streak++; d.setDate(d.getDate()-1); }
+    else break;
+  }
+  return streak;
+}
+
+/* ---------------- write screen ---------------- */
+const moodRow = document.getElementById('mood-row');
+Object.keys(MOODS).forEach(key=>{
+  const btn = document.createElement('button');
+  btn.className = 'mood-btn wobble2';
+  btn.innerHTML = moodIconSVG(key);
+  btn.title = MOODS[key].label;
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    state.mood = key;
+    document.getElementById('mood-echo').textContent = MOODS[key].label + ' mood';
+    validateForm();
+  });
+  moodRow.appendChild(btn);
+});
+
+const entryEditor = document.getElementById('entry-text');
+const wordCountEl = document.getElementById('word-count');
+const warnBox = document.getElementById('warn-box');
+const saveBtn = document.getElementById('save-btn');
+
+function wordsOf(text){ return text.trim().split(/\s+/).filter(Boolean); }
+function currentEntryText(){ return entryEditor.textContent || ''; }
+
+function validateForm(){
+  const text = currentEntryText();
+  const words = wordsOf(text);
+  const n = words.length;
+  const target = n < 50 ? 50 : 500;
+  wordCountEl.textContent = `${n}/${target}`;
+  wordCountEl.className = 'count ' + (n>=50 && n<=500 ? 'good' : (n>0 ? 'bad' : ''));
+
+  let problems = [];
+  if(n>0 && n<50) problems.push(`needs at least 50 words (${50-n} to go)`);
+  if(n>500) problems.push(`over the 500 word limit by ${n-500}`);
+  if(n>0){
+    const nonEnglishChars = (text.match(/[^\x00-\x7F]/g)||[]).length;
+    if(nonEnglishChars / text.length > 0.08) problems.push('looks like it has non-English text — English only');
+    const unique = new Set(words.map(w=>w.toLowerCase()));
+    if(n>=15 && unique.size/n < 0.35) problems.push("doesn't read like real sentences yet — try writing it out naturally");
+  }
+
+  if(problems.length){
+    warnBox.textContent = problems.join(' · ');
+    warnBox.classList.add('show');
+  } else {
+    warnBox.classList.remove('show');
+  }
+
+  const ok = n>=50 && n<=500 && problems.length===0 && state.mood;
+  saveBtn.disabled = !ok;
+}
+entryEditor.addEventListener('input', validateForm);
+
+/* ---------------- highlighting (composition-only; not persisted yet) ---------------- */
+function applyHighlight(colorClass){
+  const sel = window.getSelection();
+  if(!sel.rangeCount || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  if(!entryEditor.contains(range.commonAncestorContainer)) return;
+  const mark = document.createElement('mark');
+  mark.className = colorClass;
+  try{
+    range.surroundContents(mark);
+  }catch(e){
+    const content = range.extractContents();
+    mark.appendChild(content);
+    range.insertNode(mark);
+  }
+  sel.removeAllRanges();
+  validateForm();
+}
+document.getElementById('hl-yellow-btn').addEventListener('click', ()=> applyHighlight('hl-yellow'));
+document.getElementById('hl-green-btn').addEventListener('click', ()=> applyHighlight('hl-green'));
+document.getElementById('hl-pink-btn').addEventListener('click', ()=> applyHighlight('hl-pink'));
+document.getElementById('hl-blue-btn').addEventListener('click', ()=> applyHighlight('hl-blue'));
+document.getElementById('hl-orange-btn').addEventListener('click', ()=> applyHighlight('hl-orange'));
+entryEditor.addEventListener('click', (e)=>{
+  if(e.target.tagName==='MARK'){
+    const mark = e.target;
+    const parent = mark.parentNode;
+    while(mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
+    validateForm();
+  }
+});
+
+/* ---------------- photo attachments (drag-to-place scrapbook board) ---------------- */
+const photoInput = document.getElementById('photo-input');
+const photoLayerEl = document.getElementById('photo-layer');
+const MAX_PHOTOS = 3;
+
+function normalizePhotos(list){
+  return (list||[]).map((item, idx)=> typeof item === 'string'
+    ? { src: item, x: 25 + (idx%3)*25, y: 30 + Math.floor(idx/3)*20, rot: 0, wPct: 16, hPct: 16 }
+    : { wPct: 16, hPct: 16, ...item }
+  );
+}
+
+const MIN_PHOTO_PCT = 8;   // ~ smallest allowed size, as % of board width
+const MAX_PHOTO_PCT = 45;  // ~ largest allowed size, as % of board width
+
+function attachDrag(el, boardEl, photoObj){
+  let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
+  el.addEventListener('pointerdown', (e)=>{
+    dragging = true;
+    el.classList.add('dragging');
+    el.setPointerCapture(e.pointerId);
+    startX = e.clientX; startY = e.clientY;
+    origX = photoObj.x; origY = photoObj.y;
+  });
+  el.addEventListener('pointermove', (e)=>{
+    if(!dragging) return;
+    const rect = boardEl.getBoundingClientRect();
+    const dxPct = ((e.clientX - startX) / rect.width) * 100;
+    const dyPct = ((e.clientY - startY) / rect.height) * 100;
+    photoObj.x = Math.max(4, Math.min(96, origX + dxPct));
+    photoObj.y = Math.max(4, Math.min(96, origY + dyPct));
+    el.style.left = photoObj.x + '%';
+    el.style.top = photoObj.y + '%';
+  });
+  const endDrag = ()=>{ dragging = false; el.classList.remove('dragging'); };
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
+}
+
+function attachResize(handle, el, boardEl, photoObj){
+  let resizing = false, startX = 0, startY = 0, startWpx = 0, startHpx = 0;
+  handle.addEventListener('pointerdown', (e)=>{
+    e.stopPropagation(); // don't also trigger the drag handler on the parent photo
+    resizing = true;
+    handle.setPointerCapture(e.pointerId);
+    startX = e.clientX; startY = e.clientY;
+    startWpx = el.offsetWidth; startHpx = el.offsetHeight;
+  });
+  handle.addEventListener('pointermove', (e)=>{
+    if(!resizing) return;
+    const rect = boardEl.getBoundingClientRect();
+    const minPx = (MIN_PHOTO_PCT/100) * rect.width;
+    const maxPx = (MAX_PHOTO_PCT/100) * rect.width;
+    const newWpx = Math.max(minPx, Math.min(maxPx, startWpx + (e.clientX - startX)));
+    const newHpx = Math.max(minPx, Math.min(maxPx, startHpx + (e.clientY - startY)));
+    photoObj.wPct = (newWpx / rect.width) * 100;
+    photoObj.hPct = (newHpx / rect.width) * 100;
+    el.style.width = newWpx + 'px';
+    el.style.height = newHpx + 'px';
+  });
+  const endResize = (e)=>{ e.stopPropagation(); resizing = false; };
+  handle.addEventListener('pointerup', endResize);
+  handle.addEventListener('pointercancel', endResize);
+}
+
+function renderPhotoBoard(boardEl, photos, interactive){
+  boardEl.innerHTML = '';
+  const rect = boardEl.getBoundingClientRect();
+  photos.forEach((p, idx)=>{
+    const el = document.createElement('div');
+    el.className = 'placed-photo';
+    el.style.left = p.x + '%';
+    el.style.top = p.y + '%';
+    el.style.width = ((p.wPct/100) * rect.width) + 'px';
+    el.style.height = ((p.hPct/100) * rect.width) + 'px';
+    el.style.transform = `translate(-50%, -50%) rotate(${p.rot}deg)`;
+    el.innerHTML = `<img src="${p.src}" alt="attached photo ${idx+1}">`;
+    if(interactive){
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'remove-x';
+      removeBtn.textContent = '×';
+      removeBtn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        photos.splice(idx, 1);
+        renderPhotoBoard(boardEl, photos, true);
+      });
+      el.appendChild(removeBtn);
+
+      const handle = document.createElement('div');
+      handle.className = 'resize-handle';
+      el.appendChild(handle);
+
+      attachDrag(el, boardEl, p);
+      attachResize(handle, el, boardEl, p);
+    } else {
+      el.style.cursor = 'zoom-in';
+      el.addEventListener('click', ()=> openLightbox(p.src));
+    }
+    boardEl.appendChild(el);
+  });
+}
+
+function resizeImageFile(file, maxDim=900, quality=0.75){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let { width, height } = img;
+        if(width > maxDim || height > maxDim){
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width*scale); height = Math.round(height*scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+photoInput.addEventListener('change', async ()=>{
+  const files = Array.from(photoInput.files || []);
+  const room = MAX_PHOTOS - state.attachedImages.length;
+  for(const file of files.slice(0, room)){
+    try{
+      const dataUrl = await resizeImageFile(file);
+      const idx = state.attachedImages.length;
+      state.attachedImages.push({
+        src: dataUrl,
+        x: 30 + (idx % 3) * 20,
+        y: 35 + (Math.floor(idx / 3)) * 20,
+        rot: Number((Math.random() * 16 - 8).toFixed(1)),
+        wPct: 18,
+        hPct: 18,
+      });
+    }catch(e){ console.error('Could not process image:', e); }
+  }
+  renderPhotoBoard(photoLayerEl, state.attachedImages, true);
+  photoInput.value = '';
+});
+
+saveBtn.addEventListener('click', async ()=>{
+  const text = currentEntryText().trim();
+  const originalLabel = saveBtn.textContent;
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Turning today into a page... (can take up to a minute on first request)';
+  warnBox.classList.remove('show');
+
+  try {
+    const result = await apiFetch('/api/entries', {
+      method: 'POST',
+      body: JSON.stringify({ text, attachedImages: state.attachedImages, date: todayKey() })
+    });
+
+    invalidateEntriesCache();
+    const entries = await getAllEntries();
+    const streak = computeStreak(entries);
+    document.getElementById('confirm-streak').textContent = streak;
+    document.getElementById('confirm-image').src = result.image_base64;
+    renderPhotoBoard(document.getElementById('confirm-photos'), state.attachedImages, false);
+    state.attachedImages = [];
+    renderPhotoBoard(photoLayerEl, state.attachedImages, true);
+    show('confirm-screen');
+
+  } catch (err) {
+    console.error(err);
+    warnBox.textContent = err.message || 'Could not reach the server. Check your connection and try again.';
+    warnBox.classList.add('show');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = originalLabel;
+  }
+});
+
+document.getElementById('confirm-shelf-btn').addEventListener('click', renderShelf);
+document.getElementById('to-shelf-btn').addEventListener('click', renderShelf);
+document.getElementById('back-to-write-btn').addEventListener('click', initWriteScreen);
+
+document.getElementById('view-today-btn').addEventListener('click', async ()=>{
+  const entries = await getAllEntries();
+  openModal(todayKey(), entries[todayKey()]);
+});
+
+async function initWriteScreen(){
+  document.getElementById('today-label').textContent = prettyDate(todayKey());
+  const entries = await getAllEntries();
+  const streak = computeStreak(entries);
+  document.getElementById('streak-count').textContent = `${streak} day${streak===1?'':'s'} streak`;
+
+  if(entries[todayKey()]){
+    document.getElementById('entry-form').style.display = 'none';
+    document.getElementById('already-card').style.display = 'block';
+  } else {
+    document.getElementById('entry-form').style.display = 'block';
+    document.getElementById('already-card').style.display = 'none';
+    entryEditor.innerHTML = '';
+    state.mood = null;
+    state.attachedImages = [];
+    renderPhotoBoard(photoLayerEl, state.attachedImages, true);
+    document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('selected'));
+    document.getElementById('mood-echo').textContent = '';
+    validateForm();
+  }
+  show('write-screen');
+}
+
+/* ---------------- shelf ---------------- */
+async function renderShelf(){
+  const entries = await getAllEntries();
+  const dates = Object.keys(entries).sort();
+  const plankHost = document.getElementById('shelf-planks');
+  plankHost.innerHTML = '';
+  document.getElementById('shelf-empty').style.display = dates.length ? 'none' : 'block';
+
+  const PER_PLANK = 10;
+  for(let i=0; i<dates.length; i+=PER_PLANK){
+    const plank = document.createElement('div');
+    plank.className = 'plank';
+    dates.slice(i, i+PER_PLANK).forEach(dateKey=>{
+      const entry = entries[dateKey];
+      const m = MOODS[entry.mood] || MOODS.sunny;
+      const b = document.createElement('div');
+      b.className = 'mini-book';
+      b.style.background = m.color + 'cc';
+      const day = Number(dateKey.split('-')[2]);
+      b.textContent = day;
+      b.title = prettyDate(dateKey);
+      b.addEventListener('click', ()=> openModal(dateKey, entry));
+      plank.appendChild(b);
+    });
+    plankHost.appendChild(plank);
+  }
+  show('shelf-screen');
+}
+
+/* ---------------- modal ---------------- */
+function openModal(dateKey, entry){
+  const imgEl = document.getElementById('modal-image');
+  if (entry.imageUrl) {
+    imgEl.src = entry.imageUrl;
+  } else {
+    const svgMarkup = `<svg viewBox="0 0 100 100">${doodleSceneSVG(entry.mood, entry.keywords||[])}</svg>`;
+    imgEl.src = 'data:image/svg+xml;base64,' + btoa(svgMarkup);
+  }
+  document.getElementById('modal-date').textContent = prettyDate(dateKey);
+  document.getElementById('modal-mood').textContent = (MOODS[entry.mood]||{}).label + ' day';
+  document.getElementById('modal-text').textContent = entry.text;
+  document.getElementById('modal-tags').innerHTML = (entry.keywords||[]).map(k=>`<span>${k}</span>`).join('');
+  renderPhotoBoard(document.getElementById('modal-photos'), normalizePhotos(entry.attachedImages), false);
+  document.getElementById('modal-back').classList.add('show');
+}
+document.getElementById('modal-close').addEventListener('click', ()=> document.getElementById('modal-back').classList.remove('show'));
+document.getElementById('modal-back').addEventListener('click', (e)=>{ if(e.target.id==='modal-back') e.currentTarget.classList.remove('show'); });
+
+function openLightbox(src){
+  document.getElementById('lightbox-image').src = src;
+  document.getElementById('lightbox-back').classList.add('show');
+}
+document.getElementById('modal-image').addEventListener('click', ()=> openLightbox(document.getElementById('modal-image').src));
+document.getElementById('confirm-image').addEventListener('click', ()=> openLightbox(document.getElementById('confirm-image').src));
+document.getElementById('lightbox-back').addEventListener('click', ()=>{
+  document.getElementById('lightbox-back').classList.remove('show');
+});
+
+document.getElementById('back-to-cover-btn').addEventListener('click', async ()=>{
+  await renderCoverScreen();
+  show('cover-screen');
+});
+
+
+/* ---------------- boot ---------------- */
+document.getElementById('open-btn').addEventListener('click', initWriteScreen);
+document.getElementById('string-lights').innerHTML = stringLightsSVG();
+document.getElementById('deco-tl').innerHTML = decoFlowerSprig();
+document.getElementById('deco-tr').innerHTML = decoEnvelopes();
+document.getElementById('deco-bl').innerHTML = decoQuillInk();
+document.getElementById('deco-br').innerHTML = decoBouquet();
+
+(async function boot(){
+  renderAuthMode();
+  if(getToken()){
+    try{
+      const { user } = await apiFetch('/api/me');
+      setCachedUser(user);
+      await renderCoverScreen();
+      show('cover-screen');
+      return;
+    }catch(e){
+      clearToken();
+      localStorage.removeItem('currentUser');
+    }
+  }
+  show('auth-screen');
+})();
+</script>
+</body>
+</html>
