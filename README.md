@@ -35,9 +35,6 @@ You write a few lines about your day (50 to 500 words), pick a mood, and the app
 ## Things to know
 
 - The free hosting goes to sleep when nobody's using it, so the first request can take up to a minute.
-- Highlights only show while you're writing. They aren't saved with the entry yet.
 - You can only write one entry per day.
 
----
 
-Made by Rija ([@RVcreator](https://github.com/RVcreator))
