@@ -2,6 +2,8 @@
 
 A small journaling app I built because I wanted a nicer way to look back on my days.
 
+**Try it here:** https://journal-app123.netlify.app/
+
 You write a few lines about your day (50 to 500 words), pick a mood, and the app turns it into a little illustration. Every day you write adds a book to your shelf, and there's a streak counter to keep you honest.
 
 ## What you can do
